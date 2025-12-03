@@ -299,20 +299,6 @@ def run_episode():
                     p.resetBasePositionAndOrientation(robot, [target_x, target_y, pos[2]], new_quat)
                     jitter_cooldown = 18
                     cooldown_phase = 0
-                else:
-                    try:
-                        start = [pos[0], pos[1], pos[2]+0.1]
-                        fwd = [pos[0] + math.sin(yaw)*0.6, pos[1] + math.cos(yaw)*0.6, start[2]]
-                        r = p.rayTest(start, fwd)[0]
-                        hit_normal = r[5] if len(r) > 5 else None
-                        if hit_normal:
-                            nx, ny, _ = hit_normal
-                            push = 0.25
-                            px = pos[0] - nx * push
-                            py = pos[1] - ny * push
-                            p.resetBasePositionAndOrientation(robot, [px, py, pos[2]], quat)
-                    except Exception:
-                        pass
                 if collision_to_target_count > 6 and not detour_active:
                     try:
                         ax = math.cos(yaw)
