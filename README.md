@@ -1,16 +1,16 @@
-# SynapSense - éder leonardo e cawan
+# SynapSense - Éder, Leonardo e Cawan
 # Projeto de Robótica – N2
 # Simulações feitas em Python usando PyBullet.
 
 Conteúdo:
 
-garra → manipulador robótico (parte 1A)
+garra.py → manipulador robótico (parte 1A)
 
-carro → robô diferencial com sensores (parte 1B)
+carro.py → robô diferencial com sensores (parte 1B)
 
-aspirador → aspirador inteligente (parte 2)
+aspirador.py → aspirador inteligente (parte 2)
 
-drone → drone de entregas (parte 3)
+drone.py → drone de entregas (parte 3)
 
 Como instalar:
 
