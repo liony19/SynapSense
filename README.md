@@ -1,4 +1,4 @@
-# SynapSense - Éder, Leonardo e Cawan
+# SynapSense
 Projeto de Robótica – N2
 Simulações feitas em Python usando PyBullet.
 
