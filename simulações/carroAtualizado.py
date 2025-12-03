@@ -6,6 +6,7 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import requests
+import random
 
 import pybullet as p
 import pybullet_data
@@ -117,7 +118,7 @@ def create_finish_line(y_pos):
             )
 
 # =====================================================================
-# AMBIENTE OTIMIZADO (paredes + cilindros)
+# AMBIENTE OTIMIZADO (PAREDES + OBSTÁCULOS ALEATÓRIOS)
 # =====================================================================
 
 def create_env(length=40.0):
@@ -127,7 +128,6 @@ def create_env(length=40.0):
     wall_col = p.createCollisionShape(p.GEOM_BOX, halfExtents=[0.2, 1.5, 1])
     wall_vis = p.createVisualShape(p.GEOM_BOX, halfExtents=[0.2, 1.5, 1], rgbaColor=[0.6,0.6,0.6,1])
 
-    # 20 paredes de cada lado
     for i in range(20):
         y = (i/20)*length
         p.createMultiBody(0, wall_col, wall_vis, [ track_width/2, y, 1])
@@ -136,18 +136,29 @@ def create_env(length=40.0):
     cyl_col = p.createCollisionShape(p.GEOM_CYLINDER, radius=0.6, height=1.2)
     cyl_vis = p.createVisualShape(p.GEOM_CYLINDER, radius=0.6, length=1.2, rgbaColor=[1,0,0,1])
 
-    obstacles = [
-        (-2,4), (1.5,8), (-1,13), (2,18),
-        (-2.5,23), (0,28), (2.5,32)
-    ]
+    # Geração de Posições Aleatórias
+    NUM_OBSTACLES = 10
+    SAFE_WIDTH = (track_width / 2) - 0.8 
+    START_Y = 5.0
+    END_Y = length - 5.0
+    
+    y_base_positions = np.linspace(START_Y, END_Y, NUM_OBSTACLES)
+    
+    random_obstacles = []
+    for y_base in y_base_positions:
+        y_pos = y_base + np.random.uniform(-1.0, 1.0)
+        x_pos = np.random.uniform(-SAFE_WIDTH, SAFE_WIDTH)
+        
+        y_pos = np.clip(y_pos, START_Y, END_Y)
+        random_obstacles.append((x_pos, y_pos))
 
-    for x,y in obstacles:
-        p.createMultiBody(0, cyl_col, cyl_vis, [x,y,0.6])
+    for x, y in random_obstacles:
+        p.createMultiBody(0, cyl_col, cyl_vis, [x, y, 0.6])
 
     create_finish_line(length-1)
 
 # =====================================================================
-# SENSORES RÁPIDOS SEM LIMPAR DEBUG A CADA FRAME
+# SENSORES
 # =====================================================================
 
 def get_sensors(robot_id):
@@ -269,12 +280,10 @@ def main():
                 "vL":vL,"vR":vR
             })
 
-            # câmera apenas 1 vez por segundo
             if t-last_cam > 1.0:
                 p.resetDebugVisualizerCamera(5,0,-60,pos)
                 last_cam = t
 
-            # Node-RED a cada 12 frames
             if frame%12==0:
                 send_to_node_red({"y":float(pos[1]),"status":"running"})
 
