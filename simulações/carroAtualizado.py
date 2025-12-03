@@ -102,19 +102,24 @@ def send_to_node_red(data_dict):
 # LINHA DE CHEGADA
 # =====================================================================
 
-def create_finish_line(y_pos):
+def create_finish_line(y_pos, track_width=10.0):
     size = 0.4
+    cols = int(track_width / size) # Deve ser 25 colunas
+    
+    # Calcular a posição inicial X para centralizar a linha
+    start_x = -track_width / 2
+    
     white = p.createVisualShape(p.GEOM_BOX, halfExtents=[size/2,size/2,0.01], rgbaColor=[1,1,1,1])
     black = p.createVisualShape(p.GEOM_BOX, halfExtents=[size/2,size/2,0.01], rgbaColor=[0,0,0,1])
 
-    for i in range(10):
+    for i in range(cols):
         for j in range(2):
             color = white if (i+j)%2==0 else black
             p.createMultiBody(
                 baseMass=0,
                 baseCollisionShapeIndex=-1,
                 baseVisualShapeIndex=color,
-                basePosition=[-2+i*size, y_pos+j*size, 0.02]
+                basePosition=[start_x + i * size + size / 2, y_pos + j * size, 0.02]
             )
 
 # =====================================================================
@@ -155,7 +160,8 @@ def create_env(length=40.0):
     for x, y in random_obstacles:
         p.createMultiBody(0, cyl_col, cyl_vis, [x, y, 0.6])
 
-    create_finish_line(length-1)
+    # Passa a largura da pista para a função de linha de chegada
+    create_finish_line(length-1, track_width)
 
 # =====================================================================
 # SENSORES
