@@ -122,6 +122,9 @@ def run_episode():
     home_point = (0.0, 0.0)
     stuck_counter = 0
     last_pos = None
+    # Controle de órbita: evita ficar circulando sujeira perto da parede
+    orbit_counter = 0
+    last_target_dist = None
     while p.isConnected():
         pos, quat = p.getBasePositionAndOrientation(robot)
         
@@ -156,6 +159,36 @@ def run_episode():
                     vy_t = ty - pos[1]
                 desired_yaw = math.atan2(vx_t, vy_t)
                 ang_err = (desired_yaw - yaw + math.pi) % (2*math.pi) - math.pi
+                target_dist = math.hypot(vx_t, vy_t)
+                if last_target_dist is not None:
+                    improving = target_dist < last_target_dist - 0.01
+                    near_walls = (
+                        abs(tx - (-7.0)) < 0.5 or abs(7.0 - tx) < 0.5 or
+                        abs(ty - (-3.0)) < 0.5 or abs(17.0 - ty) < 0.5
+                    )
+                    if near_walls and not improving and not detour_active:
+                        orbit_counter += 1
+                    else:
+                        orbit_counter = max(0, orbit_counter - 1)
+                last_target_dist = target_dist
+
+                if orbit_counter > 20 and not detour_active:
+                    normals = []
+                    if abs(tx - (-7.0)) < 0.5: normals.append((1.0, 0.0))
+                    if abs(7.0 - tx) < 0.5: normals.append((-1.0, 0.0))
+                    if abs(ty - (-3.0)) < 0.5: normals.append((0.0, 1.0))
+                    if abs(17.0 - ty) < 0.5: normals.append((0.0, -1.0))
+                    nx = sum(n[0] for n in normals) if normals else 0.0
+                    ny = sum(n[1] for n in normals) if normals else 0.0
+                    offset = 0.8
+                    wx = tx + nx * offset
+                    wy = ty + ny * offset
+                    margin = 0.25
+                    wx = max(-7.0+margin, min(7.0-margin, wx))
+                    wy = max(-3.0+margin, min(17.0-margin, wy))
+                    detour_point = (wx, wy)
+                    detour_active = True
+                    orbit_counter = 0
                 if not detour_active and d2[idx] < 0.25:
                     target_close = True
                     try:
