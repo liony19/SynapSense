@@ -1,8 +1,37 @@
 import pybullet as p
 import pybullet_data
-import time, math, numpy as np, os
+import time, math, numpy as np, os, random
+import requests # Adicionado para comunicação HTTP com Node-RED
 
+# =====================================================================
+# CONFIGURAÇÕES E NODE-RED
+# =====================================================================
+
+NODE_RED_URL = "http://localhost:1880/dados-robo"
 URDF_NAME = "mobile_robot_4wd.urdf"
+
+# Variáveis globais para o ambiente
+OBST_IDS = []
+OBST_DATA = []
+DIRT_IDS = []
+DIRT_TOTAL_COUNT = 0 # Inicializado aqui, definido em build_env
+
+# Parâmetros de controle (do código original)
+LINEAR_SPEED = 0.8        
+COLLISION_DISTANCE = 0.5  
+ROTATION_SPEED = 0.05
+MAX_STEPS = 3600 # Limite de tempo de simulação
+
+def send_to_node_red(data_dict):
+    """Envia dados para o Node-RED via HTTP POST."""
+    try:
+        requests.post(NODE_RED_URL, json=data_dict, timeout=0.05)
+    except:
+        pass
+
+# =====================================================================
+# URDF DO ROBÔ
+# =====================================================================
 
 def ensure_urdf():
     """
@@ -13,10 +42,17 @@ def ensure_urdf():
         urdf = """<?xml version='1.0'?><robot name='mini'><link name='base'><visual><geometry><box size='0.4 0.3 0.1'/></geometry></visual><collision><geometry><box size='0.4 0.3 0.1'/></geometry></collision></link></robot>"""
         with open(URDF_NAME,'w') as f: f.write(urdf)
 
+# =====================================================================
+# AMBIENTE OTIMIZADO (paredes + cilindros + sujeira)
+# =====================================================================
+
 def build_env():
     """
     Configura o ambiente de simulação carregando o chão, adicionando obstáculos e criando as paredes.
     """
+    global OBST_IDS, OBST_DATA, DIRT_IDS, DIRT_TOTAL_COUNT
+    
+    p.resetSimulation()
     p.loadURDF('plane.urdf')
     
     wall_color = [0.3, 0.7, 0.7, 1]
@@ -31,7 +67,6 @@ def build_env():
     create_wall(pos=[0.0, -3.0, 1.0], extents=[7.1, 0.1, 1.0])
     create_wall(pos=[0.0, 17.0, 1.0], extents=[7.1, 0.1, 1.0])
     
-    global OBST_IDS, OBST_DATA
     OBST_IDS = []
     OBST_DATA = []
     for i in range(20): 
@@ -47,9 +82,9 @@ def build_env():
         OBST_IDS.append(oid)
         OBST_DATA.append((x, y, col_radius))
 
-    global DIRT_IDS
     DIRT_IDS = []
     dirt_count = 25
+    DIRT_TOTAL_COUNT = dirt_count # Define o total para o Node-RED
     attempts = 0
     placed = 0
     margin_from_wall = 0.3
@@ -75,6 +110,10 @@ def build_env():
         DIRT_IDS.append(did)
         placed += 1
 
+# =====================================================================
+# SENSORES
+# =====================================================================
+
 def simple_lidar(robot_id, n=9, ray_len=2.0):
     """
     Simula um sensor LiDAR simples (sensor de distância por raios).
@@ -99,18 +138,22 @@ def simple_lidar(robot_id, n=9, ray_len=2.0):
         dists.append(res[2] * ray_len)
     return dists
 
+# =====================================================================
+# EPISÓDIO DE EXECUÇÃO
+# =====================================================================
+
 def run_episode():
     """
     Roda um único episódio da simulação de navegação do aspirador.
     """
+    global DIRT_IDS, DIRT_TOTAL_COUNT, OBST_DATA
+    
     ensure_urdf()
     robot = p.loadURDF(URDF_NAME, basePosition=[0, 0, 0.2])
     traj = []
     t0 = time.time()
     
-    LINEAR_SPEED = 0.8        
-    COLLISION_DISTANCE = 0.5  
-    ROTATION_SPEED = 0.05     
+    
     
     jitter_cooldown = 0
     cooldown_phase = 0
@@ -124,6 +167,9 @@ def run_episode():
     last_pos = None
     orbit_counter = 0
     last_target_dist = None
+    
+    frame = 0 # Contador de frames para Node-RED
+    
     while p.isConnected():
         pos, quat = p.getBasePositionAndOrientation(robot)
         
@@ -139,10 +185,16 @@ def run_episode():
         
         target_bias = 0.0
         target_close = False
+        
+        current_status = "CLEANING"
+        status_msg = "Procurando sujeira..."
+        
         if ('DIRT_IDS' in globals()) and (not DIRT_IDS):
             home_active = True
             detour_active = False
             detour_point = None
+            current_status = "HOME"
+            status_msg = "Sujeira limpa. Voltando à base."
 
         if 'DIRT_IDS' in globals() and DIRT_IDS and not home_active:
             try:
@@ -156,6 +208,7 @@ def run_episode():
                     tx, ty = detour_point[0], detour_point[1]
                     vx_t = tx - pos[0]
                     vy_t = ty - pos[1]
+                    status_msg = "Desviando de rota."
                 desired_yaw = math.atan2(vx_t, vy_t)
                 ang_err = (desired_yaw - yaw + math.pi) % (2*math.pi) - math.pi
                 target_dist = math.hypot(vx_t, vy_t)
@@ -167,6 +220,8 @@ def run_episode():
                     )
                     if near_walls and not improving and not detour_active:
                         orbit_counter += 1
+                        current_status = "STUCK" # Detectando órbita ou preso
+                        status_msg = "Possível órbita ou preso perto da parede."
                     else:
                         orbit_counter = max(0, orbit_counter - 1)
                 last_target_dist = target_dist
@@ -193,6 +248,7 @@ def run_episode():
                     try:
                         p.removeBody(DIRT_IDS[idx])
                         DIRT_IDS.pop(idx)
+                        status_msg = f"Sujeira consumida. Restam {len(DIRT_IDS)}"
                     except Exception:
                         pass
                     target_bias = 0.0
@@ -212,6 +268,8 @@ def run_episode():
 
         dynamic_collision = COLLISION_DISTANCE * (0.5 if target_close else 1.0)
         if center < dynamic_collision:
+            current_status = "COLLISION"
+            status_msg = "Obstáculo à frente. Tentando desviar."
             try:
                 start = [pos[0], pos[1], pos[2]+0.1]
                 fwd = [pos[0] + math.sin(yaw)*0.8, pos[1] + math.cos(yaw)*0.8, start[2]]
@@ -237,6 +295,8 @@ def run_episode():
             if target_close:
                 vx = min(vx, 0.3)
             if left < 0.25 and right < 0.25 and center < 0.35:
+                current_status = "STUCK"
+                status_msg = "Preso. Tentando girar no lugar."
                 vx = 0.0
                 v_rot = (ROTATION_SPEED * 4.0) * (1 if right > left else -1)
             try:
@@ -271,11 +331,15 @@ def run_episode():
                 stuck_counter = 0
         last_pos = pos
         if stuck_counter > 12:
+            current_status = "STUCK"
+            status_msg = "Preso. Executando manobra de resgate."
             vx = -0.3
             v_rot = (math.pi/2) * (1 if right > left else -1)
             stuck_counter = 0
         
         if jitter_cooldown > 0:
+            current_status = "COLLISION"
+            status_msg = "Manobra de escape ativa."
             cooldown_phase += 1
             if cooldown_phase < 8:
                 vx = -0.22
@@ -359,7 +423,22 @@ def run_episode():
 
         traj.append((pos[0], pos[1]))
         
-        if len(traj) > 3600: 
+        # --- ENVIAR PARA NODE-RED (A cada 12 frames) ---
+        if frame % 12 == 0:
+            payload = {
+                "x": float(pos[0]),
+                "y": float(pos[1]),
+                "dirt_remaining": len(DIRT_IDS),
+                "dirt_total": DIRT_TOTAL_COUNT,
+                "status": current_status,
+                "status_msg": status_msg
+            }
+            send_to_node_red(payload)
+        
+        if len(traj) > MAX_STEPS: 
+            current_status = "FINISHED"
+            status_msg = "Limite de tempo atingido."
+            send_to_node_red(payload) # Envia status final
             break
         
         try:
@@ -377,13 +456,22 @@ def run_episode():
                 detour_point = None
         if home_active:
             if math.hypot(pos[0]-home_point[0], pos[1]-home_point[1]) < 0.25:
+                current_status = "FINISHED"
+                status_msg = "Limpeza e retorno concluídos!"
+                send_to_node_red(payload) # Envia status final
                 break
+        
+        frame += 1
         
     try:
         p.removeBody(robot)
     except Exception:
         pass
     return traj
+
+# =====================================================================
+# MAIN
+# =====================================================================
 
 def main():
     """
