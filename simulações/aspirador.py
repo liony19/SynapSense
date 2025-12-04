@@ -122,7 +122,6 @@ def run_episode():
     home_point = (0.0, 0.0)
     stuck_counter = 0
     last_pos = None
-    # Controle de órbita: evita ficar circulando sujeira perto da parede
     orbit_counter = 0
     last_target_dist = None
     while p.isConnected():
