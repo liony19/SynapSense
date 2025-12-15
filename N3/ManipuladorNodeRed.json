@@ -1,0 +1,401 @@
+[
+    {
+        "id": "tab_manipulador",
+        "type": "tab",
+        "label": "Manipulador KUKA IIWA",
+        "disabled": false,
+        "info": ""
+    },
+    {
+        "id": "http_in_log",
+        "type": "http in",
+        "z": "tab_manipulador",
+        "name": "POST /manipulador_log",
+        "url": "/manipulador_log",
+        "method": "post",
+        "upload": false,
+        "swaggerDoc": "",
+        "x": 160,
+        "y": 140,
+        "wires": [
+            [
+                "http_response_ok",
+                "split_data"
+            ]
+        ]
+    },
+    {
+        "id": "http_response_ok",
+        "type": "http response",
+        "z": "tab_manipulador",
+        "name": "200 OK",
+        "statusCode": "200",
+        "headers": {},
+        "x": 380,
+        "y": 80,
+        "wires": []
+    },
+    {
+        "id": "split_data",
+        "type": "function",
+        "z": "tab_manipulador",
+        "name": "Distribuir Dados",
+        "func": "// Extrai dados do payload para diferentes visualizações\nvar msg = msg.payload;\n\n// 1. Erros (Charts)\nvar msgError = { payload: msg.dist_ee_error, topic: \"Distância EE\" };\nvar msgAngError = { payload: msg.avg_angular_error, topic: \"Erro Angular Médio\" };\n\n// 2. Energia (Gauge)\nvar msgEnergy = { payload: Math.round(msg.energy_accum * 100) / 100 };\n\n// 3. Contadores (Text)\nvar statusText = \"Detectados: \" + msg.targets_detected + \" | Alcançados: \" + msg.targets_reached;\nvar msgCounts = { payload: statusText };\nvar msgReach = { payload: msg.targets_reached };\n\n// 4. Estabilidade e IK\nvar msgStab = { payload: msg.time_to_stabilize > 0 ? msg.time_to_stabilize.toFixed(2) + \"s\" : \"--\" };\nvar msgIK = { payload: msg.ik_iterations, topic: \"Iterações IK\" };\n\n// 5. Overshoot (Max)\nvar maxOver = Math.max(...msg.overshoot_max);\nvar msgOver = { payload: maxOver.toFixed(4) + \" rad\" };\n\n// 6. Dados para 3D (Passa tudo)\nvar msg3D = { payload: msg };\n\nreturn [\n    msgError, \n    msgAngError, \n    msgEnergy, \n    msgCounts, \n    msgReach, \n    msgStab,\n    msgIK,\n    msgOver,\n    msg3D\n];",
+        "outputs": 9,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 410,
+        "y": 300,
+        "wires": [
+            [
+                "chart_dist_error"
+            ],
+            [
+                "chart_ang_error"
+            ],
+            [
+                "gauge_energy"
+            ],
+            [
+                "text_status_line"
+            ],
+            [
+                "gauge_targets"
+            ],
+            [
+                "text_stabilize"
+            ],
+            [
+                "chart_ik_iter"
+            ],
+            [
+                "text_overshoot"
+            ],
+            [
+                "template_3d_plot"
+            ]
+        ]
+    },
+    {
+        "id": "chart_dist_error",
+        "type": "ui_chart",
+        "z": "tab_manipulador",
+        "name": "Erro Distância Efetuador (m)",
+        "group": "group_errors",
+        "order": 1,
+        "width": 0,
+        "height": 0,
+        "label": "Erro de Posição (m)",
+        "chartType": "line",
+        "legend": "false",
+        "xformat": "HH:mm:ss",
+        "interpolate": "linear",
+        "nodata": "",
+        "dot": false,
+        "ymin": "0",
+        "ymax": "0.5",
+        "removeOlder": "30",
+        "removeOlderPoints": "",
+        "removeOlderUnit": "1",
+        "cutout": 0,
+        "useOneColor": false,
+        "useUTC": false,
+        "colors": [
+            "#ff0000",
+            "#aec7e8",
+            "#ff7f0e",
+            "#2ca02c",
+            "#98df8a",
+            "#d62728",
+            "#ff9896",
+            "#9467bd",
+            "#c5b0d5"
+        ],
+        "outputs": 1,
+        "useDifferentColor": false,
+        "className": "",
+        "x": 750,
+        "y": 140,
+        "wires": [
+            []
+        ]
+    },
+    {
+        "id": "chart_ang_error",
+        "type": "ui_chart",
+        "z": "tab_manipulador",
+        "name": "Erro Angular Médio (rad)",
+        "group": "group_errors",
+        "order": 2,
+        "width": 0,
+        "height": 0,
+        "label": "Erro Angular Médio (rad)",
+        "chartType": "line",
+        "legend": "false",
+        "xformat": "HH:mm:ss",
+        "interpolate": "linear",
+        "nodata": "",
+        "dot": false,
+        "ymin": "0",
+        "ymax": "1",
+        "removeOlder": "30",
+        "removeOlderPoints": "",
+        "removeOlderUnit": "1",
+        "cutout": 0,
+        "useOneColor": false,
+        "useUTC": false,
+        "colors": [
+            "#1f77b4",
+            "#aec7e8",
+            "#ff7f0e",
+            "#2ca02c",
+            "#98df8a",
+            "#d62728",
+            "#ff9896",
+            "#9467bd",
+            "#c5b0d5"
+        ],
+        "outputs": 1,
+        "useDifferentColor": false,
+        "className": "",
+        "x": 750,
+        "y": 180,
+        "wires": [
+            []
+        ]
+    },
+    {
+        "id": "gauge_energy",
+        "type": "ui_gauge",
+        "z": "tab_manipulador",
+        "name": "Energia Acumulada",
+        "group": "group_physics",
+        "order": 1,
+        "width": 0,
+        "height": 0,
+        "gtype": "wave",
+        "title": "Energia Total (Torque*dt)",
+        "label": "J",
+        "format": "{{value}}",
+        "min": 0,
+        "max": "5000",
+        "colors": [
+            "#00b500",
+            "#e6e600",
+            "#ca3838"
+        ],
+        "seg1": "",
+        "seg2": "",
+        "className": "",
+        "x": 730,
+        "y": 220,
+        "wires": []
+    },
+    {
+        "id": "text_status_line",
+        "type": "ui_text",
+        "z": "tab_manipulador",
+        "group": "group_kpi",
+        "order": 2,
+        "width": 0,
+        "height": 0,
+        "name": "Status Texto",
+        "label": "Performance:",
+        "format": "{{msg.payload}}",
+        "layout": "row-spread",
+        "className": "",
+        "x": 710,
+        "y": 260,
+        "wires": []
+    },
+    {
+        "id": "gauge_targets",
+        "type": "ui_gauge",
+        "z": "tab_manipulador",
+        "name": "Alvos Alcançados",
+        "group": "group_kpi",
+        "order": 1,
+        "width": 0,
+        "height": 0,
+        "gtype": "donut",
+        "title": "Alvos Capturados",
+        "label": "pts",
+        "format": "{{value}}",
+        "min": 0,
+        "max": "50",
+        "colors": [
+            "#00b500",
+            "#e6e600",
+            "#ca3838"
+        ],
+        "seg1": "",
+        "seg2": "",
+        "className": "",
+        "x": 730,
+        "y": 300,
+        "wires": []
+    },
+    {
+        "id": "text_stabilize",
+        "type": "ui_text",
+        "z": "tab_manipulador",
+        "group": "group_kpi",
+        "order": 3,
+        "width": 0,
+        "height": 0,
+        "name": "Tempo Estabilizacao",
+        "label": "Tempo Estabilização (Last):",
+        "format": "{{msg.payload}}",
+        "layout": "row-spread",
+        "className": "",
+        "x": 740,
+        "y": 340,
+        "wires": []
+    },
+    {
+        "id": "chart_ik_iter",
+        "type": "ui_chart",
+        "z": "tab_manipulador",
+        "name": "Iterações IK",
+        "group": "group_errors",
+        "order": 3,
+        "width": 0,
+        "height": 0,
+        "label": "Iterações IK (Custo Computacional)",
+        "chartType": "bar",
+        "legend": "false",
+        "xformat": "HH:mm:ss",
+        "interpolate": "linear",
+        "nodata": "",
+        "dot": false,
+        "ymin": "0",
+        "ymax": "200",
+        "removeOlder": "20",
+        "removeOlderPoints": "",
+        "removeOlderUnit": "1",
+        "cutout": 0,
+        "useOneColor": true,
+        "useUTC": false,
+        "colors": [
+            "#ff7f0e",
+            "#aec7e8",
+            "#ff7f0e",
+            "#2ca02c",
+            "#98df8a",
+            "#d62728",
+            "#ff9896",
+            "#9467bd",
+            "#c5b0d5"
+        ],
+        "outputs": 1,
+        "useDifferentColor": false,
+        "className": "",
+        "x": 710,
+        "y": 380,
+        "wires": [
+            []
+        ]
+    },
+    {
+        "id": "text_overshoot",
+        "type": "ui_text",
+        "z": "tab_manipulador",
+        "group": "group_physics",
+        "order": 2,
+        "width": 0,
+        "height": 0,
+        "name": "Max Overshoot",
+        "label": "Max Overshoot (Juntas):",
+        "format": "{{msg.payload}}",
+        "layout": "row-spread",
+        "className": "",
+        "x": 720,
+        "y": 420,
+        "wires": []
+    },
+    {
+        "id": "template_3d_plot",
+        "type": "ui_template",
+        "z": "tab_manipulador",
+        "group": "group_3d",
+        "name": "Plot 3D Trajetória",
+        "order": 1,
+        "width": "12",
+        "height": "10",
+        "format": "<div id=\"plotly-3d-chart\" style=\"width:100%; height:100%;\"></div>\n\n<script src=\"https://cdn.plot.ly/plotly-latest.min.js\"></script>\n\n<script>\n(function(scope) {\n    var layout = {\n        margin: { t: 0, b: 0, l: 0, r: 0 },\n        scene: {\n            xaxis: { title: 'X', range: [-0.8, 0.8] },\n            yaxis: { title: 'Y', range: [-0.8, 0.8] },\n            zaxis: { title: 'Z', range: [0, 1.0] },\n            camera: {\n                eye: { x: 1.5, y: 1.5, z: 1.5 }\n            }\n        },\n        title: 'Espaço de Trabalho (Workspace)'\n    };\n\n    var traceEE = {\n        x: [], y: [], z: [],\n        mode: 'lines',\n        type: 'scatter3d',\n        name: 'Efetuador',\n        line: { color: '#1f77b4', width: 4 }\n    };\n\n    var traceTarget = {\n        x: [], y: [], z: [],\n        mode: 'markers',\n        type: 'scatter3d',\n        name: 'Alvo',\n        marker: { color: '#ff0000', size: 5, opacity: 0.8 }\n    };\n\n    Plotly.newPlot('plotly-3d-chart', [traceEE, traceTarget], layout);\n\n    scope.$watch('msg', function(msg) {\n        if (!msg || !msg.payload) return;\n        \n        var d = msg.payload;\n        var ee = d.ee;\n        var target = d.target;\n\n        // Update Trace (Manter os últimos 100 pontos para performance)\n        Plotly.extendTraces('plotly-3d-chart', {\n            x: [[ee[0]]], \n            y: [[ee[1]]],\n            z: [[ee[2]]]\n        }, [0], 200);\n\n        // Update Alvo (Apenas posição atual)\n        // Usamos 'react' ou 'restyle' para mover o alvo sem criar rastro\n        if(target) {\n             Plotly.restyle('plotly-3d-chart', {\n                x: [[target[0]]],\n                y: [[target[1]]],\n                z: [[target[2]]]\n             }, [1]);\n        }\n    });\n})(scope);\n</script>",
+        "storeOutMessages": true,
+        "fwdInMessages": true,
+        "resendOnRefresh": true,
+        "templateScope": "local",
+        "className": "",
+        "x": 730,
+        "y": 480,
+        "wires": [
+            []
+        ]
+    },
+    {
+        "id": "group_errors",
+        "type": "ui_group",
+        "z": "tab_manipulador",
+        "name": "Análise de Erro & Estabilidade",
+        "tab": "tab_dashboard_main",
+        "order": 2,
+        "disp": true,
+        "width": "12",
+        "collapse": false
+    },
+    {
+        "id": "group_physics",
+        "type": "ui_group",
+        "z": "tab_manipulador",
+        "name": "Física & Energia",
+        "tab": "tab_dashboard_main",
+        "order": 3,
+        "disp": true,
+        "width": "6",
+        "collapse": false
+    },
+    {
+        "id": "group_kpi",
+        "type": "ui_group",
+        "z": "tab_manipulador",
+        "name": "Indicadores de Desempenho (KPI)",
+        "tab": "tab_dashboard_main",
+        "order": 1,
+        "disp": true,
+        "width": "6",
+        "collapse": false
+    },
+    {
+        "id": "group_3d",
+        "type": "ui_group",
+        "z": "tab_manipulador",
+        "name": "Trajetória 3D (Workspace)",
+        "tab": "tab_dashboard_main",
+        "order": 4,
+        "disp": true,
+        "width": "12",
+        "collapse": false
+    },
+    {
+        "id": "tab_dashboard_main",
+        "type": "ui_tab",
+        "z": "tab_manipulador",
+        "name": "Supervisão Robótica",
+        "icon": "dashboard",
+        "order": 1,
+        "disabled": false,
+        "hidden": false
+    },
+    {
+        "id": "1ae3273166d02e7b",
+        "type": "global-config",
+        "env": [],
+        "modules": {
+            "node-red-dashboard": "3.6.6"
+        }
+    }
+]
