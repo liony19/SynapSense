@@ -33,7 +33,8 @@ DIRT_IDS = []
 DIRT_TOTAL_COUNT = 0
 PLANE_ID = None
 
-LINEAR_SPEED = 1.0
+LINEAR_SPEED = 1.0 # Metade do tamnho do robô é lento demais, mas abaixo está essa versão se quiser testar
+# LINEAR_SPEED = 0.5 * ROBOT_SIZE
 COLLISION_DISTANCE = 1.4
 ROTATION_SPEED = 0.18
 MAX_STEPS = 3600
@@ -72,7 +73,8 @@ def build_env():
     OBST_IDS = []
     OBST_DATA = []
     arena_area = math.pi * (ARENA_RADIUS ** 2)
-    target_obst_area = 0.01 * arena_area
+    target_obst_area = 0.01 * arena_area # Apenas 1% pois só 25% já ocupa espaço demais e demora muito pra carregar, abixo está a versão em que os obstáculos cobrem de 25% a 40%
+    # target_obst_area = arena_area * random.uniform(0.25, 0.40)
     robot_area = math.pi * ((ROBOT_SIZE * 0.5) ** 2)
     min_obst_area = 0.5 * robot_area
 
