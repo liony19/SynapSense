@@ -827,33 +827,21 @@ def main():
     p.setAdditionalSearchPath(pybullet_data.getDataPath())
     p.resetSimulation()
     build_env()
-    all_trajs = []
     run_start = time.time()
-    for ep in range(3):
-        if not p.isConnected():
-            break
-        try:
-            global RUN_DEADLINE
-            if RUN_DEADLINE is None:
-                RUN_DEADLINE = run_start + SIM_DURATION
-        except Exception:
-            pass
-        traj = run_episode()
-        all_trajs.append(traj)
-        print(f"[Simulação] Episódio {ep+1} concluído. Duração (passos): {len(traj)}")
-        try:
-            if RUN_DEADLINE is not None and time.time() >= RUN_DEADLINE:
-                try:
-                    p.disconnect()
-                except Exception:
-                    pass
-                try:
-                    os._exit(0)
-                except Exception:
-                    sys.exit(0)
-        except Exception:
-            pass
-        time.sleep(0.5)
+    try:
+        global RUN_DEADLINE
+        if RUN_DEADLINE is None:
+            RUN_DEADLINE = run_start + SIM_DURATION
+    except Exception:
+        pass
+    try:
+        send_to_node_red({"reset": True})
+    except Exception:
+        pass
+
+    traj = run_episode()
+    print(f"[Simulação] Episódio único concluído. Duração (passos): {len(traj)}")
+
     print('aspirador done - Simulação concluída.')
     if p.isConnected():
         p.disconnect()
