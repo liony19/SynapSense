@@ -7,6 +7,27 @@
         "info": ""
     },
     {
+        "id": "reset_dispatch",
+        "type": "function",
+        "z": "f6f2187d.f17ca8",
+        "name": "Aplicar Reset",
+        "func": "// Fan-out resets to widgets\n// Map: forward reset payload\nnode.send([{payload: {reset: true}}, null, null, null]);\n// Gauges: zero values\nnode.send([null, {payload: 0}, {payload: 0}, null]);\n// Status text: empty\nnode.send([null, null, null, {payload: {status_msg: ''}}]);\n// Chart: clear series\nnode.send([null, null, null, null, {payload: []}]);\nreturn null;",
+        "outputs": 5,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 520,
+        "y": 320,
+        "wires": [
+            ["c3d4e5f6.a7b8"],
+            ["e5f6a7b8.c9d0"],
+            ["f6a7b8c9.d0e1"],
+            ["b8c9d0e1.f2a3"],
+            ["c9d0e1f2.a3b4"]
+        ]
+    },
+    {
         "id": "d4b3c2a1.e5f6",
         "type": "http in",
         "z": "f6f2187d.f17ca8",
@@ -40,8 +61,8 @@
         "type": "function",
         "z": "f6f2187d.f17ca8",
         "name": "Roteador de Dados",
-        "func": "if (msg.payload.summary) {\n    return [null, msg];\n}\nreturn [msg, null];",
-        "outputs": 2,
+        "func": "if (msg.payload.summary) {\n    return [null, msg, null];\n}\nif (msg.payload.reset) {\n    return [null, null, msg];\n}\nreturn [msg, null, null];",
+        "outputs": 3,
         "noerr": 0,
         "initialize": "",
         "finalize": "",
@@ -51,15 +72,16 @@
         "wires": [
             [
                 "c3d4e5f6.a7b8",
-                "d4e5f6a7.b8c9",
                 "e5f6a7b8.c9d0",
-                "f6a7b8c9.d0e1",
                 "a7b8c9d0.e1f2",
                 "b8c9d0e1.f2a3",
-                "c9d0e1f2.a3b4"
+                "func_extract_energy"
             ],
             [
                 "d0e1f2a3.b4c5"
+            ],
+            [
+                "reset_dispatch"
             ]
         ]
     },
@@ -192,6 +214,25 @@
         "x": 650,
         "y": 320,
         "wires": []
+    },
+    {
+        "id": "func_extract_energy",
+        "type": "function",
+        "z": "f6f2187d.f17ca8",
+        "name": "Extrair Energia",
+        "func": "msg.payload = msg.payload.energy_proxy_total;\nreturn msg;",
+        "outputs": 1,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 520,
+        "y": 380,
+        "wires": [
+            [
+                "c9d0e1f2.a3b4"
+            ]
+        ]
     },
     {
         "id": "c9d0e1f2.a3b4",
