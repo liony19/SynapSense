@@ -29,6 +29,7 @@ WHEEL_CENTER_Z = -0.14
 
 OBST_IDS = []
 OBST_DATA = []
+OBST_DETAILS = []
 DIRT_IDS = []
 DIRT_TOTAL_COUNT = 0
 PLANE_ID = None
@@ -55,7 +56,7 @@ def ensure_urdf():
 
 
 def build_env():
-    global OBST_IDS, OBST_DATA, DIRT_IDS, DIRT_TOTAL_COUNT
+    global OBST_IDS, OBST_DATA, OBST_DETAILS, DIRT_IDS, DIRT_TOTAL_COUNT
     p.resetSimulation()
     global PLANE_ID
     PLANE_ID = p.loadURDF('plane.urdf')
@@ -72,6 +73,7 @@ def build_env():
 
     OBST_IDS = []
     OBST_DATA = []
+    OBST_DETAILS = []
     arena_area = math.pi * (ARENA_RADIUS ** 2)
     target_obst_area = 0.01 * arena_area # Apenas 1% pois só 25% já ocupa espaço demais e demora muito pra carregar, abixo está a versão em que os obstáculos cobrem de 25% a 40%
     # target_obst_area = arena_area * random.uniform(0.25, 0.40)
@@ -132,6 +134,7 @@ def build_env():
                 oid = p.createMultiBody(baseMass=0, baseCollisionShapeIndex=col, baseVisualShapeIndex=vis, basePosition=[x, y, height*0.5])
                 OBST_IDS.append(oid)
                 OBST_DATA.append((x, y, col_rad))
+                OBST_DETAILS.append({'type': 'cyl', 'x': x, 'y': y, 'r': col_rad})
             else:
                 col = p.createCollisionShape(p.GEOM_BOX, halfExtents=half_ext)
                 vis = p.createVisualShape(p.GEOM_BOX, halfExtents=half_ext, rgbaColor=[0.2, 0.5, 0.7, 1])
@@ -139,6 +142,7 @@ def build_env():
                 OBST_IDS.append(oid)
                 box_radius = math.hypot(half_ext[0], half_ext[1])
                 OBST_DATA.append((x, y, box_radius))
+                OBST_DETAILS.append({'type': 'box', 'x': x, 'y': y, 'w': half_ext[0]*2, 'h': half_ext[1]*2})
 
             placed_area += this_area
             sector_area[sector_idx] += this_area
@@ -752,6 +756,7 @@ def run_episode():
                 "cleaned_distances": cleaned_distances,
                 "total_distance": total_distance,
                 "occupancy_map": occ_map,
+                "obstacles": OBST_DETAILS,
                 "dirt_map": dirt_map,
                 "near_misses": near_miss_count,
                 "energy_proxy_total": energy_proxy_total,
